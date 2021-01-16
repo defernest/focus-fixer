@@ -1,0 +1,91 @@
+image:  golang:1.14
+
+stages:
+  - build
+  - test
+  - upload
+  - release
+
+variables:
+  PACKAGE_VERSION: "0.1.0"
+
+  LINUX_386_BINARY: "bin/x32/linux/focusfix"
+  FREEBSD_386_BINARY: "bin/x32/freebsd/focusfix"
+  DARWIN_386_BINARY: "bin/x32/darwin/focusfix"
+  WINDOWS_386_BINARY: "bin/x32/windows/focusfix.exe"
+
+  LINUX_AMD64_BINARY: "bin/x64/linux/focusfix"
+  FREEBSD_AMD64_BINARY: "bin/x64/freebsd/focusfix"
+  DARWIN_AMD64_BINARY: "bin/x64/darwin/focusfix"
+  WINDOWS_AMD64_BINARY: "bin/x64/windows/focusfix.exe"
+
+  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/focusfix_release/${PACKAGE_VERSION}"
+
+build:
+  stage: build
+  tags: 
+    - docker_shared
+  script:
+    - make compile
+  artifacts:
+    paths:
+      - bin/
+    expire_in: 1h
+test:
+  tags: 
+    - docker_shared
+  stage: test
+  script:
+    - echo "Test run"
+upload:
+  stage: upload
+  tags: 
+    - docker_shared
+  image: curlimages/curl:latest
+  needs:
+    - job: build
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${LINUX_386_BINARY} ${PACKAGE_REGISTRY_URL}/${LINUX_386_BINARY}
+    - |
+      echo "curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${LINUX_386_BINARY} ${PACKAGE_REGISTRY_URL}/${LINUX_386_BINARY}"
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${FREEBSD_386_BINARY} ${PACKAGE_REGISTRY_URL}/${FREEBSD_386_BINARY}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${DARWIN_386_BINARY} ${PACKAGE_REGISTRY_URL}/${DARWIN_386_BINARY}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${WINDOWS_386_BINARY} ${PACKAGE_REGISTRY_URL}/${WINDOWS_386_BINARY}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${LINUX_AMD64_BINARY} ${PACKAGE_REGISTRY_URL}/${LINUX_AMD64_BINARY}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${FREEBSD_AMD64_BINARY} ${PACKAGE_REGISTRY_URL}/${FREEBSD_AMD64_BINARY}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${DARWIN_AMD64_BINARY} ${PACKAGE_REGISTRY_URL}/${DARWIN_AMD64_BINARY}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${WINDOWS_AMD64_BINARY} ${PACKAGE_REGISTRY_URL}/${WINDOWS_AMD64_BINARY}
+
+release:
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: build
+    - job: upload
+      artifacts: true
+  tags: 
+    - docker_shared
+  stage: release
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      release-cli create --name "FocusFixer $CI_COMMIT_TAG" --tag-name $CI_COMMIT_TAG \
+        --assets-link "{\"name\":\"${LINUX_386_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_386_BINARY}\"}" \
+        --assets-link "{\"name\":\"${FREEBSD_386_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${FREEBSD_386_BINARY}\"}" \
+        --assets-link "{\"name\":\"${DARWIN_386_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${DARWIN_386_BINARY}\"}" \
+        --assets-link "{\"name\":\"${WINDOWS_386_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${WINDOWS_386_BINARY}\"}" \
+        --assets-link "{\"name\":\"${LINUX_AMD64_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_AMD64_BINARY}\"}" \
+        --assets-link "{\"name\":\"${FREEBSD_AMD64_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${FREEBSD_AMD64_BINARY}\"}" \
+        --assets-link "{\"name\":\"${DARWIN_AMD64_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${DARWIN_AMD64_BINARY}\"}" \
+        --assets-link "{\"name\":\"${WINDOWS_AMD64_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${WINDOWS_AMD64_BINARY}\"}"
